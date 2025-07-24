@@ -1,114 +1,536 @@
-import tkinter as tk
-from tkinter import ttk
-from PIL import Image, ImageTk
-import requests
-from io import BytesIO
-import webbrowser
-from serpapi import GoogleSearch
+'''
+Name: Rafael Rojero
+Date: 07/23/2025
+CS 3300-001 Summer 2025 Group 10 Class Project: PRiceSnipr
+Description of this program: This Python program, called PriceSnipr, is a desktop application built with Tkinter
+that lets users search for products using Google Shopping via the SerpAPI. Users can filter results by store,
+sort by price or popularity, and translate product info into other languages. The app displays search results
+with images, prices, and store names, and users can click images to open product links. It also includes a watchlist
+feature where users can set price alerts; when a product drops below the target price, a desktop notification is
+triggered and logged in the history. The app supports light/dark themes, remembers user data between sessions using
+a JSON file, and uses Google Translate, PIL, and Plyer for translation, image handling, and notifications.
+'''
 
-#  SERPAPI KEY 
-SERPAPI_KEY = ""
+# Importing necessary standard and third-party libraries
+import os # For interacting with the operating system (like checking/reading files)
+import json # For working with JSON data (saving/loading watchlist)
+import tkinter as tk # For building the main GUI
+from tkinter import ttk, simpledialog, messagebox # Extra widgets for styling, prompts, and popup messages
+from PIL import Image, ImageTk  # For loading and displaying images inside the GUI
+import requests # For making HTTP requests I use this to download images from URLs
+from io import BytesIO # To treat image content as a file-like object in memory
+import webbrowser # Lets us open product links in the default web browser
+from serpapi import GoogleSearch # Used to perform product searches using the SerpAPI service
+from googletrans import Translator # For translating product info into other languages
+from plyer import notification # For showing desktop notifications when price alerts trigger
 
-# Function to open a URL in the default web browser
-def open_link(url):
-    if url:
-        webbrowser.open(url)
 
-# Function to search and display products
-def search_products():
-    for widget in results_frame.winfo_children():
-        widget.destroy()
+# Config & Persistence
 
-    query = product_entry.get()
-    target_store = store_var.get()
+# This flag controls whether product links open in a new browser tab
+OPEN_IN_NEW_TAB = True
 
-    params = {
-        "engine": "google_shopping",
-        "q": query,
-        "api_key": SERPAPI_KEY
-    }
+# My personal SerpAPI key for making product search requests
+SERPAPI_KEY      = ""
 
-    search = GoogleSearch(params)
-    results = search.get_dict()
-    products = results.get("shopping_results", [])
+# This is the name of the file where the watchlist and alert history are saved
+WATCHLIST_FILE   = "watchlist.json"
 
-    for product in products:
-        store = product.get("source")
-        if target_store != "All" and store != target_store:
-            continue
+# This function loads watchlist and alert history from the JSON file
+def load_watchlist():
+    # If the file exists, open and read it
+    if os.path.exists(WATCHLIST_FILE):
+        with open(WATCHLIST_FILE, "r") as f:
+            data = json.load(f) # Load the JSON content into a Python dictionary
+            return data.get("items", []), data.get("history", []) # Return lists of items and history
+        # If the file doesn't exist, return empty lists
+    return [], []
 
-        frame = tk.Frame(results_frame, pady=5, bg="#ffffff")
-        frame.pack(fill="x", anchor="w")
+# This function saves the current watchlist and alert history to the JSON file
+def save_watchlist(items, history):
+    with open(WATCHLIST_FILE, "w") as f:
+        json.dump({"items": items, "history": history}, f, indent=2) # Save both lists with indentation
 
-        img_url = product.get("thumbnail")
-        image = None
-        if img_url:
+# Load the watchlist and history into global variables at the start
+watch_items, alert_history = load_watchlist()
+
+
+# Translator & Watchlist Logic
+
+# Creates an instance of the Google Translator so we can use it later to translate product text
+translator = Translator()
+
+# Creates an alias so we can refer to the watchlist simply as `watchlist` instead of `watch_items`
+watchlist = watch_items  # alias for runtime
+
+# This function adds a product to the watchlist and sets a price alert for it
+def add_watch(product, current_price):
+    # Gets the product title (or empty string if missing)
+    title = product.get("title","")
+    # Get the product link from 'link' or fallback to 'product_link'
+    link  = product.get("link") or product.get("product_link")
+
+    # Ask the user to enter a target price for when they want to be alerted
+    target = simpledialog.askfloat(
+        "Set Price Alert", # Window title
+        f"\"{title}\"\nCurrent price: ${current_price:.2f}\n\nAlert when price ≤:" # Prompt message
+    )
+    # If the user clicked OK and entered a value
+    if target is not None:
+        # Creates a new entry with title, link, target price, and notify flag
+        entry = {"title": title, "link": link, "target": target, "notified": False}
+
+        # Add this new entry to the watchlist
+        watchlist.append(entry)
+
+        # Save the updated watchlist and alert history to disk
+        save_watchlist(watchlist, alert_history)
+
+        # Refresh the Watchlist tab UI so the new item appears
+        refresh_watch_views()
+
+        # Send a desktop notification to confirm the watch was added
+        notification.notify(
+            title="Watchlist",
+            message=f"Added “{title}” at target ${target:.2f}",
+            timeout=5  # Show notification for 5 seconds
+        )
+
+
+# Theme definitions
+# Define two themes: light and dark with specific colors for background, foreground, frames, and buttons
+THEMES = {
+    # Main background color (light gray), main text color (black), background color for product result frames
+    # Background color for buttons, text color on buttons
+    "light": {"bg":"#f8f8f8","fg":"#000000","frame_bg":"white","button_bg":"green","button_fg":"white"},
+
+    # Main background color (dark gray), main text color (white), background for result frames,
+    # Button background in dark mode, button text color in dark mode
+    "dark":  {"bg":"#2e2e2e","fg":"#ffffff","frame_bg":"#3e3e3e","button_bg":"#555555","button_fg":"#ffffff"},
+}
+
+# Start the app using the light theme by default
+current_theme = "light"
+
+# Function to apply the current theme to all elements in the interface
+def apply_theme():
+    th = THEMES[current_theme] # Grab the color scheme for the selected theme
+
+    # Apply background color to main parts of the GUI
+    root.configure(bg=th["bg"])
+    search_tab.configure(bg=th["bg"])
+    watch_tab.configure(bg=th["bg"])
+    search_main_frame.configure(bg=th["bg"])
+    search_canvas.configure(background=th["bg"])
+    search_results_frame.configure(background=th["bg"])
+
+    # Go through all widgets inside the search_main_frame
+    for w in search_main_frame.winfo_children():
+        cls = w.__class__.__name__ # Gets the type of the widget
+        if cls in ("Label","Entry","Combobox"):
             try:
-                response = requests.get(img_url)
-                img_data = Image.open(BytesIO(response.content))
-                img_data = img_data.resize((80, 80))
-                image = ImageTk.PhotoImage(img_data)
+                w.configure(bg=th["bg"], fg=th["fg"]) # Set background and text colors
+            except:
+                pass
+        if cls == "Button":
+            try:
+                w.configure(bg=th["button_bg"], fg=th["button_fg"]) # Set button colors
             except:
                 pass
 
+    # For each product result frame, apply the frame background and label text color
+    for frame in search_results_frame.winfo_children():
+        frame.configure(bg=th["frame_bg"])
+        for w in frame.winfo_children():
+            if w.__class__.__name__=="Label":
+                w.configure(bg=th["frame_bg"], fg=th["fg"])
+
+    # Update styling for treeviews (used in the watchlist tab)
+    for tv in (watch_tv, hist_tv):
+        style = ttk.Style()
+        style.configure("Treeview",
+                        background=th["frame_bg"],
+                        foreground=th["fg"],
+                        fieldbackground=th["frame_bg"])
+
+    # Update the screen to reflect the theme changes immediately
+    root.update_idletasks()
+
+
+# Tooltip helper class
+
+# This class creates a simple tooltip that shows when the user hovers over a widget
+class Tooltip:
+
+    # The constructor takes in a widget and the text to display
+    def __init__(self, widget, text):
+        self.widget,self.text = widget,text # Store the widget and text
+        self.tipwindow = None  # This will be the little window that appears on hover
+
+        # Bind mouse events to show and hide the tooltip
+        widget.bind("<Enter>", self.show) # When mouse enters widget area, show tooltip
+        widget.bind("<Leave>", self.hide)  # When mouse leaves widget area, hide tooltip
+
+    # This method displays the tooltip
+    def show(self, event=None):
+        if self.tipwindow or not self.text:
+            return # Don't show tooltip if it's already visible or no text to show
+
+        # Get the current mouse pointer position and add a little offset
+        x = self.widget.winfo_pointerx()+10
+        y = self.widget.winfo_pointery()+10
+
+        # Create a new top-level window (no border/decorations)
+        tw = tk.Toplevel(self.widget);
+        tw.wm_overrideredirect(True) # Remove window borders/title bar
+        tw.wm_geometry(f"+{x}+{y}") # Position it near the mouse
+
+        # Create the label inside the tooltip window
+        # Tooltip text, background color of tooltip, border style, border width, small font, wrap text after 300 pixels
+        lbl = tk.Label(tw,text=self.text,bg="lightyellow",relief="solid",
+                       borderwidth=1,font=("Arial",8),wraplength=300)
+
+        lbl.pack(); # Adds the label to the tooltip window
+        self.tipwindow=tw  # Save reference so we can close it later
+
+    # This method closes the tooltip when the mouse leaves
+    def hide(self, event=None):
+        if self.tipwindow:
+            self.tipwindow.destroy(); # Destroy the tooltip window
+            self.tipwindow=None # Clear the reference
+
+
+# Link opening
+# This function opens a product link in the web browser
+def open_link(url, event=None):
+    if url:
+        # Use the system's default browser to open the link
+        # The new=2 argument tells it to open in a new tab if possible
+        webbrowser.open(url, new=(2 if OPEN_IN_NEW_TAB else 0))
+
+
+# Search & Display
+# This function is called when the user presses the "Search" button.
+def search_products():
+    # Show the loading progress bar at the top
+    loading_bar.pack(fill="x", pady=(0,10))  # Add padding on the bottom
+    loading_bar.start() # Start the animated loading bar
+    root.update_idletasks() # Refresh the GUI so the bar shows immediately
+
+    # Clear out any previous search results from the results frame
+    for w in search_results_frame.winfo_children():
+        w.destroy()
+
+    # Get the search query and options selected by the user
+    query          = product_entry.get().strip() # The product search text
+    selected_store = store_var.get()  # The store chosen from dropdown
+    sort_option    = sort_var.get()  # The sorting method chosen
+    target_lang    = lang_var.get()  # The language to translate to
+
+    # Builds the parameters for the SerpAPI request
+    params = {
+        "engine":"google_shopping", # Use the shopping engine
+        "q":query, # Set the search query
+        "api_key":SERPAPI_KEY} # Use your SerpAPI key
+
+    # If user selected "Free Shipping Only", add that filter to the API request
+    if sort_option == "Free Shipping Only":
+        params["free_shipping"] = "true"
+
+    # Send the search request to SerpAPI
+    search  = GoogleSearch(params)
+    results = search.get_dict() # Get the full dictionary response
+    products= results.get("shopping_results",[]) or []  # Extract the list of products
+
+    # Sort the results based on the selected sorting option
+    if sort_option in ("Lowest Price","Highest Price"):
+        # Define helper to extract price as float (removing $ and commas)
+        def price_of(p):
+            s = str(p.get("price","")).replace("$","").replace(",","")
+            try:
+                return float(s)
+            except:
+                return 0.0
+
+        # Sort in ascending (Lowest Price) or descending (Highest Price)
+        products.sort(key=price_of, reverse=(sort_option=="Highest Price"))
+
+    elif sort_option == "Most Popular":
+        # Sorts by number of reviews in descending order
+        products.sort(
+          key=lambda p:int(str(p.get("reviews","0")).replace(",","") or 0),
+          reverse=True
+        )
+    elif sort_option == "Least Popular":
+        # Sorts by number of reviews in ascending order
+        products.sort(
+          key=lambda p:int(str(p.get("reviews","0")).replace(",","") or 0)
+        )
+
+    # Loop through each product returned from SerpAPI
+    for product in products:
+        store = product.get("source") # Get the name of the store
+
+        # If user selected a specific store and the product isn't from that store, skip it
+        if selected_store!="All" and store!=selected_store:
+            continue
+
+        # Get current theme colors (light or dark mode)
+        th = THEMES[current_theme]
+
+        # Create a frame to hold the product info
+        frame = tk.Frame(
+            search_results_frame,  # Parent is the scrollable results area
+            pady=8, padx=10,  # Padding inside the frame
+            bg=th["frame_bg"],  # Background color based on theme
+            relief="solid",bd=1)   # Border style and thickness
+        frame.pack(fill="x",anchor="w",pady=5) # Make it stretch horizontally, add spacing
+
+        # image
+        img_url = product.get("thumbnail") # Get the image URL
+        image  = None # Placeholder for the processed image
+
+        if img_url:
+            try:
+                # Download the image from the URL
+                resp = requests.get(img_url, timeout=5)
+                # Resize it to 90x90 and convert to a Tkinter-compatible image
+                pil  = Image.open(BytesIO(resp.content)).resize((90,90),Image.LANCZOS)
+                image = ImageTk.PhotoImage(pil)
+            except:
+                pass # If the image fails to load, just skip it
+
         if image:
-            img_label = tk.Label(frame, image=image, bg="#ffffff", cursor="hand2")
-            img_label.image = image
-            img_label.pack(side="left", padx=5)
-            img_label.bind("<Button-1>", lambda e, url=product.get("link"): open_link(url))
+            # Create a clickable label to show the image
+            lbl = tk.Label(frame,image=image,cursor="hand2",
+                           bg=th["frame_bg"],bd=1,relief="flat")
 
-        text = f"{product.get('title', 'No title')}\nPrice: {product.get('price', 'N/A')}\nStore: {store}"
-        tk.Label(frame, text=text, justify="left", bg="#ffffff", font=("Arial", 10, "bold" if "title" in product else "normal"), wraplength=500).pack(side="left", padx=10)
+            lbl.image = image; # Keep a reference so it doesn't get garbage collected
+            lbl.pack(side="left",padx=10) # Place image on left side of frame
 
-# GUI Setup
-root = tk.Tk()
-root.title("PriceSnipr - Multi-Store Tracker")
-root.configure(bg="#f0f0f0")
+            # Hover effects: raise border on hover
+            lbl.bind("<Enter>", lambda e,l=lbl:l.configure(relief="raised",bd=2))
+            lbl.bind("<Leave>", lambda e,l=lbl:l.configure(relief="flat",bd=1))
 
-# Main frame with padding
-frame = tk.Frame(root, bg="#f0f0f0")
-frame.pack(pady=20)
+            # Get the product link to open when clicked
+            link = product.get("link") or product.get("product_link")
 
-# Load and display the logo image
+            # Show tooltip with the product link when hovering over image
+            Tooltip(lbl, link)
+
+            # Create a right-click context menu with options
+            menu = tk.Menu(root, tearoff=0)
+            menu.add_command(label="Open Link",command=lambda url=link:open_link(url))
+            menu.add_command(label="Copy Link",command=lambda url=link:(
+                root.clipboard_clear(),root.clipboard_append(url)))
+
+            # Show context menu on right-click
+            lbl.bind("<Button-3>",lambda e,m=menu:m.tk_popup(e.x_root,e.y_root))
+            # Open link in browser on left-click
+            lbl.bind("<Button-1>",lambda e,url=link:open_link(url))
+
+        # current price
+        price_str = product.get("price","").replace("$","").replace(",","")  # Clean price string
+        try:
+            current_price = float(price_str) # Try to convert it to a float
+        except:
+            current_price = None   # If it fails, treat as None
+
+        # watch/star
+        star_btn = tk.Button(
+            frame,  # Add the button to the product frame
+            text="☆", # Unicode star symbol
+            command=lambda p=product,cp=current_price: add_watch(p,cp),  # Call function when clicked
+            bg=th["frame_bg"],  # Match theme background
+            fg=th["fg"],   # Match theme text color
+            bd=0, font=("Arial",14)  # No border and large font size
+        )
+        star_btn.pack(side="right",padx=10)  # Position it on the right with spacing
+
+        # info text
+        info = (f"{product.get('title','No title')}\n"   # Product title
+                f"Price: {product.get('price','N/A')}\n"   # Product price
+                f"Store: {store}")  # Store name
+
+        # If rating and review count exist, add them
+        if product.get("rating"):
+            info += f"\nRating: {product['rating']}⭐ ({product['reviews']} reviews)"
+        if target_lang!="English":
+            code = {"Spanish":"es",
+                    "French":"fr",
+                    "German":"de",
+                    "Chinese":"zh-cn"}[target_lang] # Get the language code for Google Translate
+
+            # Translate the info text
+            info = translator.translate(info, dest=code).text
+
+        text_lbl = tk.Label(frame, text=info, justify="left",
+                            font=("Arial",10), bg=th["frame_bg"],
+                            fg=th["fg"], wraplength=500)
+        text_lbl.pack(side="left",padx=10)  # Put it to the left of the star button and image
+
+        # desktop alert
+        if current_price is not None: # Only proceed if the price is a number
+            for w in watchlist:  # Loop through each item in the watchlist
+                # If not already notified check if this is the same product and price has dropped to or below target
+                if not w["notified"] and w["link"]==link and current_price<=w["target"]:
+                    notification.notify(
+                        title="Price Alert", # Notification title
+                        message=f"“{w['title']}” is now ${current_price:.2f}", # Message body
+                        timeout=10 # Show for 10 seconds
+                    )
+                    w["notified"] = True
+                    from datetime import datetime
+                    alert_history.append({
+                        "title": w["title"],
+                        "price":  f"${current_price:.2f}",
+                        "when":   datetime.now().strftime("%Y-%m-%d %H:%M")
+                    })
+                    save_watchlist(watchlist, alert_history) # Save updated watchlist and alert history to file
+                    refresh_watch_views()  # Refresh the watchlist + history UI display
+
+    # Hide the loading animation once done
+    loading_bar.stop()
+    loading_bar.pack_forget()
+
+# ===================================================================
+# UI Setup with Notebook
+# ===================================================================
+root = tk.Tk() # Creates the main application window
+root.title("PriceSnipr") # Set the window title
+
+notebook = ttk.Notebook(root)  # Create a tabbed notebook interface
+notebook.pack(fill="both", expand=True) # Fill entire window and allow resizing
+
+# -- Search Tab --
+search_tab = tk.Frame(notebook) # Creates a frame to hold the search UI
+notebook.add(search_tab, text="Search")  # Add it as a new tab labeled "Search"
+
+search_main_frame = tk.Frame(search_tab) # Main container for logo and controls
+search_main_frame.pack(pady=20) # Add vertical padding around it
+
+loading_bar = ttk.Progressbar(search_main_frame, mode="indeterminate") # Loading bar (hidden until search starts)
+search_canvas = tk.Canvas(search_tab, borderwidth=0) # Canvas to hold scrolling results
+search_results_frame = tk.Frame(search_canvas) # Frame to hold individual product entries
+search_scrollbar = tk.Scrollbar(search_tab, orient="vertical", command=search_canvas.yview)  # Scrollbar setup
+search_canvas.configure(yscrollcommand=search_scrollbar.set)  # Attach canvas to scrollbar
+
+search_scrollbar.pack(side="right", fill="y") # Position scrollbar to the right
+search_canvas.pack(side="left", fill="both", expand=True) # Expand canvas to fill area
+search_canvas.create_window((0,0), window=search_results_frame, anchor="nw") # Embed results_frame inside canvas
+# Update scrollable area on resize
+search_results_frame.bind("<Configure>", lambda e: search_canvas.configure(scrollregion=search_canvas.bbox("all")))
+
+# Logo (optional)
 try:
-    logo_image = Image.open("PriceSnipr_Logo.png")
-    logo_image = logo_image.resize((300, 150), Image.LANCZOS)
-    logo_photo = ImageTk.PhotoImage(logo_image)
-    logo_label = tk.Label(frame, image=logo_photo, bg="#f0f0f0")
-    logo_label.image = logo_photo
-    logo_label.pack(pady=(0, 10))
-except Exception as e:
-    print("Error loading logo:", e)
+    logo = Image.open("PriceSnipr_Logo.png").resize((280,120), Image.LANCZOS) # Load and resize logo
+    logo_photo = ImageTk.PhotoImage(logo)  # Convert to Tkinter-compatible image
+    tk.Label(search_main_frame, image=logo_photo).pack() # Display the logo
+    tk.Label(search_main_frame, image=logo_photo).image = logo_photo # Keep a reference so it doesn’t get garbage-collected
+except:
+    pass
 
-# Title
-tk.Label(frame, text="PriceSnipr", font=("Arial", 24, "bold"), bg="#f0f0f0").pack(pady=(0, 15))
+# Controls
+tk.Label(search_main_frame, text="PriceSnipr", font=("Arial",22,"bold")).pack(pady=(10,20)) # App title
+tk.Label(search_main_frame, text="Product Name:", font=("Arial",10,"bold")).pack(anchor="w") # Label for product entry
+product_entry = tk.Entry(search_main_frame, width=50); # Input box for product name
+product_entry.pack(pady=4)  # Add vertical spacing
 
-# Product entry
-tk.Label(frame, text="Product Name or Type:", font=("Arial", 10, "bold"), bg="#f0f0f0").pack(anchor="w")
-product_entry = tk.Entry(frame, width=50)
-product_entry.pack(pady=2)
 
-# Store selection
-tk.Label(frame, text="Select Store:", font=("Arial", 10, "bold"), bg="#f0f0f0").pack(anchor="w")
-store_var = tk.StringVar(value="All")
-store_dropdown = ttk.Combobox(frame, textvariable=store_var, values=["All", "Amazon.com", "Best Buy", "Walmart", "Target", "GameStop", "Sam's Club", "BrandsMart USA", "PlayStation"], state="readonly")
-store_dropdown.pack(pady=2)
+tk.Label(search_main_frame, text="Select Store:", font=("Arial",10,"bold")).pack(anchor="w") # Label for store filter
+store_var      = tk.StringVar(value="All") # Variable to track selected store
+store_dropdown = ttk.Combobox(
+    search_main_frame, textvariable=store_var,
+    values=["All","Amazon.com","Walmart","Best Buy","Target","GameStop","Sam's Club","PlayStation"],
+    state="readonly" # Prevent manual text input
+)
+store_dropdown.pack(pady=4)  # Add vertical padding
 
-# Search button
-search_button = tk.Button(frame, text="Track Price", command=search_products, bg="green", fg="white", font=("Arial", 10, "bold"))
-search_button.pack(pady=10)
+tk.Label(search_main_frame, text="Sort By:", font=("Arial",10,"bold")).pack(anchor="w") # Label for sorting
+sort_var      = tk.StringVar(value="Relevance")  # Track selected sorting option
+sort_dropdown = ttk.Combobox(
+    search_main_frame, textvariable=sort_var,
+    values=["Relevance","Highest Price","Lowest Price","Most Popular","Least Popular","Free Shipping Only"],
+    state="readonly"
+)
+sort_dropdown.pack(pady=4)
 
-# Scrollable results frame
-canvas = tk.Canvas(root, borderwidth=0, background="#f0f0f0")
-results_frame = tk.Frame(canvas, background="#f0f0f0")
-scrollbar = tk.Scrollbar(root, orient="vertical", command=canvas.yview)
-canvas.configure(yscrollcommand=scrollbar.set)
+tk.Label(search_main_frame, text="Translate To:", font=("Arial",10,"bold")).pack(anchor="w") # Label for language selection
+lang_var      = tk.StringVar(value="English") # Track selected language
+lang_dropdown = ttk.Combobox(
+    search_main_frame, textvariable=lang_var,
+    values=["English","Spanish","French","German","Chinese"], # Languages supported
+    state="readonly"
+)
+lang_dropdown.pack(pady=4)
 
-scrollbar.pack(side="right", fill="y")
-canvas.pack(side="left", fill="both", expand=True)
-canvas.create_window((0, 0), window=results_frame, anchor="nw")
+tk.Button(search_main_frame, text="Dark Mode",
+    command=lambda: (globals().update(current_theme=("dark" if current_theme=="light" else "light")),
+                     apply_theme())  # Apply updated theme immediately
+).pack(pady=6)
+tk.Button(search_main_frame, text="Search", command=search_products).pack(pady=12)  # Main button to trigger search
 
-# Configure scrolling
-results_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+# -- Watchlist Tab --
+watch_tab = tk.Frame(notebook)  # Create a frame to hold the watchlist content
+notebook.add(watch_tab, text="Watchlist") # Add it as a tab titled "Watchlist"
 
-root.mainloop()
+watch_tv = ttk.Treeview(watch_tab, columns=("Title","Target","Notified"), show="headings", height=8)
+for col in ("Title","Target","Notified"):
+    watch_tv.heading(col, text=col) # Set column headers
+watch_tv.pack(fill="x", pady=(10,0), padx=10) # Stretch table width and add spacing
+
+
+def remove_selected():
+    sel = watch_tv.selection() # Get selected rows
+    if not sel:
+        messagebox.showinfo("Remove Item","Select a watch to remove.") # Show info box if nothing is selected
+        return
+
+    # Loop through selected row IDs
+    for iid in sel:
+        title, tgt_str, notif = watch_tv.item(iid,"values")  # Gets values from the row
+        tgt_val = float(tgt_str.replace("$","")) # Converts target price from string to float
+        for w in watch_items:
+            # Matches item precisely
+            if w["title"]==title and abs(w["target"]-tgt_val)<1e-6:
+                # Removes from the global watchlist
+                watch_items.remove(w)
+                break
+    save_watchlist(watch_items, alert_history) # Saves updated data to disk
+    refresh_watch_views() # Refreshes table display
+
+tk.Button(watch_tab, text="Remove Selected", command=remove_selected).pack(pady=5) # Button to trigger item removal
+
+def clear_history():
+    if messagebox.askyesno("Clear History","Delete all alert history?"): # Ask for confirmation
+        alert_history.clear()  # Remove all entries
+        save_watchlist(watch_items, alert_history)  # Save the cleared history
+        refresh_watch_views() # Refresh UI
+
+tk.Button(watch_tab, text="Clear History", command=clear_history).pack(pady=5)  # Button to clear history
+
+hist_tv = ttk.Treeview(watch_tab, columns=("Title","Price","When"), show="headings", height=6)
+for col in ("Title","Price","When"):
+    hist_tv.heading(col, text=col)  # Set the table headers
+hist_tv.pack(fill="x", pady=(20,0), padx=10) # Pack table into layout with spacing
+
+def refresh_watch_views():
+    watch_tv.delete(*watch_tv.get_children()) # Clear all rows from watchlist table
+    # Loop through all current watchlist items
+    for item in watch_items:
+        # show "Added" once notified, blank otherwise
+        status = "Added" if item["notified"] else ""
+        watch_tv.insert("", "end", values=(
+            item["title"],
+            f"${item['target']:.2f}",
+            status
+        )) # Add row to table
+    hist_tv.delete(*hist_tv.get_children()) # Clears all rows from history table
+    # Loops through all alerts triggered
+    for event in alert_history:
+        hist_tv.insert("", "end", values=(event["title"], event["price"], event["when"]))  # Add history entry as row
+
+refresh_watch_views() # Populate tables with saved data
+apply_theme() # Apply the current theme colors
+root.mainloop()  # Start the Tkinter GUI event loop and keeps window open
+
