@@ -95,15 +95,20 @@ Click the **Dark Mode** button to switch themes instantly.
 
 ---
 #  Testing
-- Use pytest to add unit tests for:
+- Run all tests (via pytest)
+   ```bash
+   pytest test/
+   
+Test coverage includes:
 
-- Price parsing logic ("$1,234.56" → 1234.56)
+Price parsing logic (e.g. "$1,234.56" → 1234.56)
 
-- Sort/filter functions
+Watchlist loading and persistence
 
-- Watchlist persistence
+Notification logic
 
-  pytest tests/
+Sorting filters
+
 
 
 ---
