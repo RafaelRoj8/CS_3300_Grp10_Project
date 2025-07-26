@@ -61,6 +61,7 @@ No Python installation required.
 
 1. Open terminal or command prompt.
 2. Navigate to the project directory:
+      ```bash
    cd path/to/PriceSnipr
 
 # Install dependencies:
