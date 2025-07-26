@@ -99,15 +99,15 @@ Click the **Dark Mode** button to switch themes instantly.
    ```bash
    pytest test/
    
-Test coverage includes:
+- Test coverage includes:
 
-Price parsing logic (e.g. "$1,234.56" → 1234.56)
+- Price parsing logic (e.g. "$1,234.56" → 1234.56)
 
-Watchlist loading and persistence
+- Watchlist loading and persistence
 
-Notification logic
+- Notification logic
 
-Sorting filters
+- Sorting filters
 
 
 
