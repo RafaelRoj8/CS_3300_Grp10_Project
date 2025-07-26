@@ -11,30 +11,66 @@
 
 ---
 
-##  Key Features
+## Key Features
 
 - **Multi‑Store Search**  
-  Query dozens of merchants via SerpAPI.
+  Search products across Amazon, Walmart, Best Buy, Target, GameStop, and more using SerpAPI.
 
 - **Watchlist & Desktop Alerts**  
-  “☆” a product, set a target price, and get notified when it drops.
-
-- **Dark Mode & Themes**  
-  Easy toggle between light and dark for day/night use.
+  Add items to a watchlist, set a price target, and get a desktop notification when the current price meets your criteria.
 
 - **Language Translation**  
-  Translate product info on the fly (EN ↔ ES, FR, DE, ZH) using `googletrans`.
+  Translate product descriptions into Spanish, French, German, or Chinese using `googletrans`.
 
-- **Standalone Packaging**  
-  One‑click Windows `.exe` built with PyInstaller—you don’t need Python installed.
+- **Dark Mode Toggle**  
+  Instantly switch between light and dark UI themes.
+
+- **Persistent Storage**  
+  Automatically saves watchlist and alert history to a local JSON file.
+
+- **Image Previews and Clickable Links**  
+  Product thumbnails open product pages in the browser.
+
+- **Standalone Executable**  
+  Includes support for packaging into a `.exe` file for Windows users without Python.
 
 ---
 
-##  Using the Pre‑built Executable
+## Using the Pre-Built Executable (Windows)
 
-Unzip **PriceSnipr.zip** (contains `PriceSnipr.exe`, `watchlist.json`, `PriceSnipr_Logo.png`).
+1. Download and unzip `PriceSnipr.zip`, which contains:
+   - `PriceSnipr.exe`
+   - `watchlist.json`
+   - `PriceSnipr_Logo.png`
 
-Double‑click **PriceSnipr.exe** to launch.
+2. Double-click `PriceSnipr.exe` to launch the app.
+
+No Python installation required.
+
+---
+
+## How to Run from Source
+
+### Method 1: Run in PyCharm
+
+1. Open the project in PyCharm.
+2. Run the `PriceSnipr.py` script.
+3. The GUI should appear.
+
+### Method 2: Run from Terminal (Python 3.12+ Required)
+
+1. Open terminal or command prompt.
+2. Navigate to the project directory:
+
+   ```
+bash
+cd path/to/PriceSnipr
+
+# Install dependencies:
+pip install -r requirements.txt
+
+# Run the script: 
+python PriceSnipr.py
 
 ---
 
