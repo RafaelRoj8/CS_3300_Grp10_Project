@@ -141,7 +141,7 @@ Click the **Dark Mode** button to switch themes instantly.
 
 ---
 
-# 📜 License
+# License
 This project is licensed under the MIT License.
 
 You are free to use, copy, modify, and distribute this software with attribution.
