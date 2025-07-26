@@ -63,10 +63,6 @@ No Python installation required.
       ```bash
    cd path/to/PriceSnipr
 
-# Install dependencies:
-```
-pip install -r requirements.txt
-```
 # Run the script: 
 ```
 python PriceSnipr.py
