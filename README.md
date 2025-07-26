@@ -11,7 +11,7 @@
 
 ---
 
-## 🚀 Key Features
+##  Key Features
 
 - **Multi‑Store Search**  
   Query dozens of merchants via SerpAPI.
@@ -30,7 +30,7 @@
 
 ---
 
-## 📦 Using the Pre‑built Executable
+##  Using the Pre‑built Executable
 
 Unzip **PriceSnipr.zip** (contains `PriceSnipr.exe`, `watchlist.json`, `PriceSnipr_Logo.png`).
 
@@ -38,7 +38,7 @@ Double‑click **PriceSnipr.exe** to launch.
 
 ---
 
-## 🎬 Usage Examples
+##  Usage Examples
 
 **Basic Search**  
 1. Enter **Nintendo Switch** in the **Product Name** field.  
@@ -60,7 +60,7 @@ Double‑click **PriceSnipr.exe** to launch.
 Click the **Dark Mode** button to switch themes instantly.
 
 ---
-# 🧪 Testing
+#  Testing
 - Use pytest to add unit tests for:
 
 - Price parsing logic ("$1,234.56" → 1234.56)
@@ -80,7 +80,7 @@ Click the **Dark Mode** button to switch themes instantly.
   --icon=PriceSnipr_Logo.ico \
   --add-data "watchlist.json;." \
 
-## 📁 Project Structure
+##  Project Structure
 
 --PriceSnipr.py \
 --requirements.txt \
@@ -94,7 +94,7 @@ Click the **Dark Mode** button to switch themes instantly.
 
   ---
 
-  # 👥 Team & Credits
+  #  Team & Credits
   
 - CS 3300‑001 Summer 2025
 - Team 10: Rafael Rojero, Dylan Lareno
