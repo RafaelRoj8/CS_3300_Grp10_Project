@@ -136,13 +136,15 @@ Click the **Dark Mode** button to switch themes instantly.
   #  Team & Credits
   
 - CS 3300‑001 Summer 2025
-- Team 10: Rafael Rojero, Dylan Lareno
+- Team 10: Rafael Rojero
 - Advisor: Dr. Armin Moin | TA: Himon Thakur
 
 ---
 
 # 📜 License
 This project is licensed under the MIT License.
+
+You are free to use, copy, modify, and distribute this software with attribution.
 
 
 
