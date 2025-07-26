@@ -64,7 +64,7 @@ No Python installation required.
    cd path/to/PriceSnipr
 
 # Install dependencies:
-     ```bash
+    ```
      pip install -r requirements.txt
 
 # Run the script: 
