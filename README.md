@@ -64,12 +64,12 @@ No Python installation required.
    cd path/to/PriceSnipr
 
 # Install dependencies:
-    ```
-     pip install -r requirements.txt
+  ```bash
+pip install -r requirements.txt
 
 # Run the script: 
      ```bash
-     python PriceSnipr.py
+python PriceSnipr.py
 
 ---
 
