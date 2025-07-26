@@ -1,4 +1,3 @@
-[![Build Status](https://github.com/RafaelRoj8/CS_3300_Grp10_Project/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/RafaelRoj8/CS_3300_Grp10_Project/actions)
 [![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Packaged with PyInstaller](https://img.shields.io/badge/Packaged_with-PyInstaller-orange.svg)](https://pyinstaller.org/)
